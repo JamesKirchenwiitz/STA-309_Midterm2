@@ -1,0 +1,344 @@
+---
+title: "Midterm 2"
+author: "James Kirchenwitz"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Reading in data
+
+```{r}
+library(tidyverse)
+library(maps)
+library(ggthemes)
+library(RCurl)
+library(patchwork)
+
+
+# reading in data
+a <- getURL('https://raw.githubusercontent.com/oconnellmj/sta309/main/milk-production-tonnes.csv')
+b <- getURL('https://raw.githubusercontent.com/oconnellmj/sta309/main/per-capita-milk-consumption.csv')
+milk_production <- read.csv(text = a)
+milk_consumption <- read.csv(text = b)
+
+```
+
+## EDA
+
+```{r}
+# Reading in world map data:
+map_data <- map_data('world') %>%
+  filter(region != 'Antarctica') %>%
+  mutate(country = str_to_lower(region)) %>%
+  select(-subregion)
+
+# basic cleaning of columns
+# Want to focus on a decades worth of consumption
+
+production <- milk_production %>%
+  mutate(production = Milk.Production..tonnes.) %>%
+  filter(Year >= 2000,
+         Year <= 2010) %>%
+  group_by(Entity) %>%
+  summarise(production = mean(production)) 
+
+consumption <- milk_consumption %>%
+  mutate(consumption = Milk.consumption..kilograms.per.year.per.capita.) %>%
+  filter(Year >= 2000,
+         Year <= 2010) %>%
+  group_by(Entity) %>%
+  summarise(consumption = mean(consumption))
+  
+production$Entity[production$Entity == 'United States'] <- 'USA'
+production$Entity[production$Entity == 'Democratic Republic of Congo'] <- 'democratic republic of the congo'
+production$Entity[production$Entity == 'Sudan (former)'] <- 'sudan'
+consumption$Entity[consumption$Entity == 'United States'] <- 'USA'
+consumption$Entity[consumption$Entity == 'Democratic Republic of Congo'] <- 'democratic republic of the congo'
+consumption$Entity[consumption$Entity == 'Sudan (former)'] <- 'sudan'
+
+
+
+# Creating map data for production
+world_production <- production %>%
+  mutate(country = str_to_lower(Entity)) %>%
+  right_join(map_data, by=c("country"))
+
+# creating map data for consumption
+world_consumption <- consumption %>%
+  mutate(country = str_to_lower(Entity)) %>%
+  right_join(map_data, by=c("country"))
+
+#looking at production and consumption over time
+production_time <- milk_production %>%
+  mutate(production = Milk.Production..tonnes.) %>%
+  group_by(Year) %>%
+  summarise(production = mean(production))
+
+consumption_time <- milk_consumption %>%
+  mutate(consumption = Milk.consumption..kilograms.per.year.per.capita.) %>%
+  group_by(Year) %>%
+  summarise(consumption = mean(consumption))
+
+
+
+  
+```
+
+## Plotting
+
+```{r}
+production_plot <- ggplot(world_production, aes(x=long, y=lat, group = group)) +
+  geom_path() +
+  geom_polygon(aes(fill=production), color="gray30") + 
+  scale_fill_gradient2(low="blue3", high="yellow4",
+                       midpoint = 50000000, limits=c(0,100000000)) +
+  labs(title = 'Global Production',
+       subtitle = 'Examining Mean Milk Production (tonnes) for 2000-2010',
+       x = 'Longitude',
+       y = 'Latitude',
+       caption = 'Graph shows that the United States and India lead in global milk production, no other countries relativly compare. The \nmajority of Africa produces roughly the same amount of milk.') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_blank(), 
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+#production_plot
+
+consumption_plot <- ggplot(world_consumption, aes(x=long, y=lat, group = group)) +
+  geom_path() +
+  geom_polygon(aes(fill=consumption), color="gray30") + 
+  scale_fill_gradient2(low="blue3", high="yellow4",
+                       midpoint = 180, limits=c(1,360)) +
+  labs(title = 'Global Consumption',
+       subtitle = 'Examining Mean Milk Consumption (kg per capita) for 2000-2010',
+       x = 'Longitude',
+       y = 'Latitude',
+       caption = 'United States, Australia, and Canada lead for global consumption of milk. Africa consumes more milk than they \nproduce, must be due to climate or other various factors. Very interesting seeing how countries that produce very \nlittle consume a lot in retrospect.') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_blank(), 
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+#consumption_plot
+
+consumption_o_time <- ggplot(consumption_time, aes(x = Year, y = consumption)) +
+  geom_line() +
+  theme_bw() +
+  geom_vline(xintercept = 2005, color = 'firebrick', size = 1.5) +
+  geom_vline(xintercept = 2017, color = 'firebrick', size = 1.5) +
+  annotate(geom = 'text', x = 2011, y = 85, label = 'Focus Area', color = 'firebrick') +
+  labs(title = 'World Consumption Over Time',
+       subtitle = 'Visualizing Average Consumption of Milk for Every Country',
+       y = 'Consumption (kg)',
+       caption = 'Overall consumption increases pretty consistinly, but a large dip in consumption is present around 2007. A deeper look into \nproduction around this time is necassary to visualize why consumption dropped so much. In order to do this, a focus area \nfrom 2005 to 2017 is going to be used.') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+
+prod_o_time <- ggplot(production_time, aes(x = Year, y = production)) +
+  geom_line() +
+  theme_bw() +
+  geom_vline(xintercept = 2005, color = 'firebrick', size = 1.5) +
+  geom_vline(xintercept = 2017, color = 'firebrick', size = 1.5) +
+  annotate(geom = 'text', x = 2011, y = 13500000, label = 'Focus Area', color = 'firebrick') +
+  labs(title = 'World Production Over Time',
+       subtitle = 'Visualizing Average Production of Milk for Every Country',
+       y = 'Production (Tonnes)',
+       caption = 'Focus area shows there is an increase in production from 2005-2017. This production does not show any correlation \nwith the decrease in consumption that was shown in the same time frame. This indicates that there is more external \nfactors than just production that leads to the consumption decrease.') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+#prod_o_time
+
+plot <- (consumption_plot + production_plot) / (consumption_o_time + prod_o_time) + 
+  plot_annotation(
+    title="Global Milk Data Analysis",
+    subtitle="In-depth Analysis of Global Milk Consumption and Production",
+    caption="Source: OurWorldInData.org",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+                  plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+                  plot.caption = element_text(color = 'grey50'))) 
+ggsave('Global_milk_analysis.png', plot = plot, height = 10, width = 16)
+```
+
+
+
+# Sentiment analysis
+
+```{r}
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(ggwordcloud)
+library(tidytext)
+library(ggplot2)
+
+word_sentiments <- get_sentiments("bing")
+
+# reading in swift data
+data <- getURL('https://raw.githubusercontent.com/adashofdata/taylor_swift_data/refs/heads/main/Taylor_Swift_Genius/taylor_swift_genius_data.csv')
+df <- read.csv(text = data)
+metadata <- getURL('https://raw.githubusercontent.com/adashofdata/taylor_swift_data/refs/heads/main/Taylor_Swift_Spotify/taylor_swift_spotify_data.csv')
+metadata <- read.csv(text = metadata)
+
+
+
+meta2a <- metadata %>%
+  group_by(Album) %>%
+  summarise(Danceability = mean(Danceability),
+            Energy = mean(Energy))
+
+taylor_metadata <- df %>%
+  inner_join(meta2a, by = 'Album') %>%
+  unnest_tokens(word, Lyrics) %>%
+  inner_join(word_sentiments, by = 'word')
+
+# cleaning to get words for my two albums
+taylor_2a <- df %>%
+  filter(Album == 'Fearless' | Album == 'Red') %>%
+  select(Album, Lyrics) %>%
+  unnest_tokens(word, Lyrics)
+
+taylor_df <- df %>%
+  select(Album, Lyrics) %>%
+  unnest_tokens(word, Lyrics)
+
+# removing stop words
+stopwords <- get_stopwords()
+
+# Creating data for Red album word cloud
+taylor_red_word <- taylor_2a %>%
+  filter(Album == 'Red') %>%
+  anti_join(stopwords) %>%
+  group_by(word) %>%
+  summarize(N=n()) %>%
+  arrange(desc(N)) %>%
+  slice(1:100)
+
+# Creating data for Fearless word cloud
+taylor_fear_word <- taylor_2a %>%
+  filter(Album == 'Fearless') %>%
+  anti_join(stopwords) %>%
+  group_by(word) %>%
+  summarize(N=n()) %>%
+  arrange(desc(N)) %>%
+  slice(1:100)
+
+taylor_sentiment_2a <- taylor_2a %>% inner_join(word_sentiments, by='word')
+taylor_sentiment <- taylor_df %>% inner_join(word_sentiments, by = 'word')
+
+
+
+```
+
+# Wordcloud Plots
+```{r}
+red_cloud <- ggplot(taylor_red_word, aes(label = word, size = N)) +
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 20) +
+  theme_minimal() +
+  labs(title = 'Red Word Cloud',
+       subtitle = 'Word Cloud for Taylors Red album') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+
+fearless_cloud <- ggplot(taylor_fear_word, aes(label = word, size = N)) +
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 20) +
+  theme_minimal() +
+  labs(title = 'Fearless Word Cloud',
+       subtitle = 'Word Cloud for Taylors Fearless album') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+
+cloud_plot <- (red_cloud + fearless_cloud)
+cloud_plot
+
+# metadata analysis
+
+energy_plot <- ggplot(taylor_metadata) +
+  geom_bar(aes(x = Album, fill = sentiment, color = Energy), size = 2) +
+  coord_cartesian(expand=F) +
+  theme_minimal() +
+  scale_fill_manual("Sentiment", values = c('negative' = "firebrick", 'positive' = 'pink')) +
+  labs(title = 'Energy Analysis',
+       y = 'Word Count',
+       subtitle = 'Comparing Taylor Swifts Albums with their Energy Values',
+       caption = 'It appears that Taylor Swifts 1989 album has the highest average energy compared to all of her other albums. Additionally it \nhas the third highest positive sentiment count, which could be a cause for the high energy.') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+
+danceability_plot <- ggplot(taylor_metadata) +
+  geom_bar(aes(x = Album, fill = sentiment, color = Danceability), size = 2) +
+  coord_cartesian(expand=F) +
+  theme_minimal() +
+  scale_fill_manual("Sentiment", values = c('negative' = "firebrick", 'positive' = 'pink')) +
+  labs(title = 'Danceability Analysis',
+       y = 'Word Count',
+       subtitle = 'Comparing Taylor Swifts Albums with their Danceability Values',
+       caption = 'Taylor Swifts Lover album has the highest danceability rating. This could be due to a multiple of external factors, but I believe \nit to be correlated to the fact that Lover has the highest positive sentiment out of all her albums') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+meta_plot <- (energy_plot + danceability_plot)
+
+# Sentiment Analysis
+
+one <- ggplot(taylor_sentiment_2a) +
+  geom_bar(aes(x = Album, fill = sentiment)) +
+  coord_cartesian(expand=F) +
+  theme_minimal() +
+  labs(title = 'Two Album Analysis',
+       subtitle = 'Comparing Taylor Swifts Red vs Fearless Album',
+       y = 'Word Count',
+       caption = 'Red has higher word counts for both positive and negative word sentiment. This is probably due to the fact the album \nis bigger. When referncing the two, Red has a higher ratio of negative to positive words compared to Fearless') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+one
+
+two <- ggplot(taylor_sentiment) +
+  geom_bar(aes(x = Album, fill = sentiment)) +
+  coord_cartesian(expand=F) +
+  theme_minimal() +
+  labs(title = 'Every Album Analysis',
+       subtitle = 'Comparing all of Taylor Swifts Albums',
+       y = 'Word Count',
+       caption = 'Lover and 1989 have pretty similar word counts. Lover has the highest positive sentiment, followed by Red, then 1989. It \nappears overall that she has higher positive word sentiment relative to negative word sentiment.') +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        plot.caption = element_text(hjust = 0, color = 'grey50'))
+two
+
+sent_dashboard <- ((cloud_plot) / ((one + two) / (meta_plot))) +
+  plot_annotation(
+    title="Taylor Swift Sentiment Analysis",
+    subtitle="In-depth Analysis of Taylor Swifts Lyrics, Albums, and Metadata",
+    caption="Source: https://github.com/adashofdata/taylor_swift_data",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = 'bold', size = 20),
+                  plot.subtitle = element_text(hjust = 0.5, color = 'grey50'),
+                  plot.caption = element_text(color = 'grey50'))) 
+sent_dashboard
+ggsave('Sentiment_dashboard.png', plot = sent_dashboard, width = 15, height = 16)
+
+
+```
