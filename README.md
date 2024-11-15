@@ -3,7 +3,8 @@
 
  ## Global Milk Analysis 
   In order to analyze milk on a global scale, I created two mercater projection plots to visualize the production and consumption of every country around the world. In order to ease the analysis process, I condensed the time frame from 2000-2010. This helped to get an overall sense of the average production / consumption for a decade time frame. Since those graphs don't account for the full range of data, some production / consumption over time plots were needed in order to grasp the temporal evolution of the date. Within these plots something intersting was observed, an extremely sharp decline in global consumption. This can be visualized by this figure:
-![Global_milk_analysis](https://github.com/user-attachments/assets/e4f63a76-c4de-4eee-a89c-5d96ffd33349)
+![Global_milk_analysis](https://github.com/user-attachments/assets/9aefadf4-44cb-4c97-82d2-c7b117634d5b)
+
 Intersting enough the global production did not fall at all during this timeframe, it continued ramping up as time went on. This leads me to believe that there were some external factors that led to this.
 
 ## Sentiment analysis
