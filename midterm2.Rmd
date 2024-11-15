@@ -94,7 +94,7 @@ consumption_time <- milk_consumption %>%
 production_plot <- ggplot(world_production, aes(x=long, y=lat, group = group)) +
   geom_path() +
   geom_polygon(aes(fill=production), color="gray30") + 
-  scale_fill_gradient2(low="blue3", high="yellow4",
+  scale_fill_gradient2(high="blue3", low="yellow4",
                        midpoint = 50000000, limits=c(0,100000000)) +
   labs(title = 'Global Production',
        subtitle = 'Examining Mean Milk Production (tonnes) for 2000-2010',
@@ -113,7 +113,7 @@ production_plot <- ggplot(world_production, aes(x=long, y=lat, group = group)) +
 consumption_plot <- ggplot(world_consumption, aes(x=long, y=lat, group = group)) +
   geom_path() +
   geom_polygon(aes(fill=consumption), color="gray30") + 
-  scale_fill_gradient2(low="blue3", high="yellow4",
+  scale_fill_gradient2(high="blue3", low="yellow4",
                        midpoint = 180, limits=c(1,360)) +
   labs(title = 'Global Consumption',
        subtitle = 'Examining Mean Milk Consumption (kg per capita) for 2000-2010',
